@@ -1,0 +1,78 @@
+---
+title: "Linear Models"
+author: "Emma Sexton"
+date: "2022-11-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+library(viridis)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 6,
+  out.width = "90%"
+)
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+```
+
+
+Load NYC Airbnb Data
+
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(stars = review_scores_location / 2) %>% 
+  rename(
+    borough = neighbourhood_group
+  ) %>% 
+  filter(borough != "Staten Island") %>% 
+  select(price, stars, borough, neighbourhood, room_type)
+```
+
+
+## Fit the first model
+
+```{r}
+fit = lm(price ~ stars + borough, data = nyc_airbnb)
+
+fit
+# tells you coefficients
+```
+
+
+Can start extracting (gives you more info)
+```{r}
+summary(fit)
+
+summary(fit)$coef
+```
+
+
+```{r}
+fit %>% 
+  broom::tidy() %>% 
+  mutate(
+    term = str_replace(term, "borough", "Borough: ")
+  ) %>% 
+  select(term, estimate, p.value) %>% 
+  knitr::kable(digits = 2)
+```
+
+
+
+
