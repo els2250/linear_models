@@ -5,11 +5,11 @@ date: "2022-11-14"
 output: github_document
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include = FALSE}
 library(tidyverse)
 library(p8105.datasets)
 library(viridis)
@@ -147,6 +147,49 @@ fit_null = lm(price ~ stars, data = nyc_airbnb)
 fit_alt = lm(price ~ stars + borough, data = nyc_airbnb)
 
 anova(fit_null, fit_alt) %>% 
+  broom::tidy()
+```
+
+
+## Room type by borough
+
+Interactions...? 
+Short answer: yeah... long answer: oh gosh
+
+```{r}
+fit = 
+  nyc_airbnb %>% 
+  lm(price ~ stars + borough * room_type, data = .) %>% 
+  broom::tidy()
+```
+
+Follow your nose by writing down: if this predictor is this and and this one is that then what is the thing turn out to be 
+
+What we'll do instead: If I really wanted to know what the effect of room type in Brooklyn Manhattan, and the Bronx -- just fit separate linear models for each of those (the interpretation within each of those models is easier); disadvantage -- can't do testing in that way --> need to build a specific model
+
+
+Exploratory Analysis of the Effect of Room Type in each of the Boroughs
+
+So... can we fit models by borough?
+
+```{r}
+nyc_airbnb %>% 
+  nest(df = -borough) %>% 
+  mutate(
+    models = map(.x = df, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(borough, results) %>% 
+  unnest(results)
+```
+
+
+Quick double check ...?
+
+```{r}
+nyc_airbnb %>% 
+  filter(borough == "Queens") %>%
+  lm(price ~ stars + room_type, data = .) %>% 
   broom::tidy()
 ```
 
