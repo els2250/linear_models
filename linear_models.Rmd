@@ -107,6 +107,50 @@ fit %>%
 
 
 
+## Diagnostics 
+
+Putting residuals in the data frame
+
+```{r}
+modelr::add_residuals(nyc_airbnb, fit) %>%
+  ggplot(aes(x = stars, y = resid)) +
+  geom_point()
+```
+
+They're suppposed to be mean 0 and constant variance -- at the very least, we're running into issues there (lots more variance in 4-5 compared to 1-3)
+
+* Constant variance assumption doesn't work here
+* Doesn't mean our regression is invalid
+* If we wanted to do hypothesis testing, we might have to be concerned about non-constant variance
+* If you wanted to get a confidence interval for the effect of stars, maybe you do have to worry about this
+* If you wanted to exclude outliers -- maybe that'd make sense
+
+```{r}
+nyc_airbnb %>% 
+  modelr::add_residuals(fit) %>% 
+  ggplot(aes(x = borough, y = resid)) +
+  geom_violin() +
+  ylim(-250, 250)
+```
+
+Here, assumptions aren't met but the sample size is big -- don't know what to do here.
+
+## Hypothesis testing
+
+One coefficient (let's say `stars`).
+
+```{r}
+fit %>% 
+  broom::tidy()
+
+fit_null = lm(price ~ stars, data = nyc_airbnb)
+fit_alt = lm(price ~ stars + borough, data = nyc_airbnb)
+
+anova(fit_null, fit_alt) %>% 
+  broom::tidy()
+```
+
+
 
 
 
