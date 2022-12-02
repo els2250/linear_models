@@ -1,0 +1,192 @@
+---
+title: "Cross Validation"
+author: "Emma Sexton"
+date: "2022-12-02"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+library(modelr)
+library(mgcv)
+library(viridis)
+
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 6,
+  out.width = "90%"
+)
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+set.seed(1)
+```
+
+
+## Step One
+
+Cross-validation "by hand" on simulated data
+
+```{r}
+nonlin_df = 
+  tibble(
+    id = 1:100, # 100 rows
+    x = runif(100, 0, 1), # uniform distribution
+    y = 1 - 10 * (x - .3) ^ 2 + rnorm(100, 0, .3) # non-linear relationship between x and y
+  )
+
+nonlin_df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point()
+```
+
+X is between 0 and 1 and there's a non-linear relationship
+
+
+Let's get this by hand.
+
+Take a training data set that's 80% and then the testing dataframe that will be the rest
+```{r}
+train_df = sample_n(nonlin_df, 80)
+# creating df with 80% of dataset
+test_df = anti_join(nonlin_df, train_df, by = "id")
+# give me everything that's not in my training dataset
+
+train_df %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_point(data = test_df, color = "red")
+```
+
+
+Let's try to fit three models...
+Nothing to do with TESTING dataset -- this all has to do with training data
+
+Applying simple linear model, then smooth model, then wiggly (breaks the model a little bit)
+
+```{r}
+linear_mod = lm(y ~ x, data = train_df)
+smooth_mod = mgcv::gam(y ~ s(x), data = train_df)
+wiggly_mod = mgcv::gam(y ~ s(x, k = 30), sp = 10e-6, data = train_df)
+```
+
+Let's see the results.
+
+```{r}
+train_df %>% 
+  add_predictions(linear_mod) %>% # gives column with predictions
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+# model isn't complex enough to fit the dataset
+
+train_df %>% 
+  add_predictions(smooth_mod) %>% # gives column with predictions
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+# this one has a reasonably good fit
+
+train_df %>% 
+  add_predictions(wiggly_mod) %>% # gives column with predictions
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+# this one has gone too much; it's too complex
+```
+
+How would you pick between the models? You use cross-validation!
+
+
+Let's make predictions and compute RMSEs.
+Add predictions to the dataframe from this model
+
+```{r}
+test_df %>% add_predictions(linear_mod)
+```
+
+These values have nothing to do with the dataset.
+
+```{r}
+rmse(linear_mod, test_df)
+rmse(smooth_mod, test_df)
+rmse(wiggly_mod, test_df)
+```
+
+LOWER IS BETTER -- think of RMSE as prediction error (lower is more accurate)
+
+Do this over and over again --> the way we do that is having a dataframe with training/testing split and then iterating
+
+
+## Can we iterate...?
+
+```{r}
+cv_df = 
+  crossv_mc(nonlin_df, 100)
+```
+This created a big dataset containing a bunch of little datasets
+
+
+```{r}
+cv_df %>% 
+  pull(train) %>% 
+  .[[1]]
+```
+Get first entry of that list --> what they're trying to do is that you don't have to keep track of these dataframes, you just have to keep track of the training/testing results
+
+```{r}
+cv_df %>% 
+  pull(train) %>% 
+  .[[1]] %>% 
+  as_tibble
+```
+
+
+What we need to be able to do is FIT THE MODELS WE CARE ABOUT to the data
+Apply in each training dataset a linear model and then get a RMSE out of that
+
+
+```{r}
+cv_df <-
+  crossv_mc(nonlin_df, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  )
+```
+
+Goal is to fit linear model to the first training dataset and then the next etc.
+
+```{r}
+cv_df =
+  crossv_mc(nonlin_df, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble),
+    linear_fits = map(.x = train, ~lm(y ~ x, data = .x))
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
